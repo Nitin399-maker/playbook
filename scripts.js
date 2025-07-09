@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
         nextPage: document.getElementById('nextPage'),
     };
     
-    let totalPages = 0, currentPage = 1, pages = [], pdfDocument = null, extractedImages = [], rawTextContent = [];
+    let totalPages = 0, currentPage = 1, pages = [], pdfDocument = null;
     
     els.browseButton.onclick = () => els.pdfUpload.click();
     els.pdfUpload.onchange = (e) => {
@@ -59,9 +59,6 @@ document.addEventListener('DOMContentLoaded', function() {
     async function processHybridStrategy(pdfArrayBuffer) {
         showLoader('Processing PDF...');
         try {
-            await extractTextContent();
-            // Removed: await extractImages(pdfArrayBuffer);
-            await generateBaseHTML();
             await enhanceWithLLM();
             hideLoader();
             finishConversion();
@@ -73,177 +70,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    async function extractTextContent() {
-        rawTextContent = [];
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-            try {
-                const page = await pdfDocument.getPage(pageNum);
-                const textContent = await page.getTextContent();
-                const viewport = page.getViewport({ scale: 1.0 });
-                
-                const textStructure = {
-                    pageNum,
-                    blocks: [],
-                    tables: [],
-                    lists: [],
-                    headings: []
-                };
-                
-                // Process text items
-                const allItems = textContent.items.map(item => ({
-                    text: item.str || '',
-                    x: item.transform[4],
-                    y: item.transform[5],
-                    width: item.width || 0,
-                    height: item.height || 0,
-                    fontSize: Math.abs(item.transform[0]) || 12,
-                    fontName: item.fontName || 'default'
-                })).filter(item => item.text.trim().length > 0);
-                
-                // Sort by position
-                const sortedItems = allItems.sort((a, b) => {
-                    const yDiff = Math.abs(b.y - a.y);
-                    if (yDiff < Math.max(a.fontSize, b.fontSize) * 0.7) {
-                        return a.x - b.x;
-                    }
-                    return b.y - a.y;
-                });
-                
-                // Create blocks
-                const blocks = createBlocks(sortedItems);
-                textStructure.blocks = blocks;
-                textStructure.tables = detectTables(blocks);
-                textStructure.lists = detectLists(blocks);
-                textStructure.headings = detectHeadings(blocks);
-                
-                rawTextContent.push(textStructure);
-                
-            } catch (error) {
-                console.error(`Error extracting text from page ${pageNum}:`, error);
-                rawTextContent.push({
-                    pageNum,
-                    blocks: [],
-                    tables: [],
-                    lists: [],
-                    headings: []
-                });
-            }
-        }
-    }
-    
-    function createBlocks(sortedItems) {
-        const blocks = [];
-        let currentBlock = null;
-        
-        sortedItems.forEach(item => {
-            const isNewBlock = !currentBlock || 
-                               Math.abs(currentBlock.y - item.y) > 3 ||
-                               Math.abs(currentBlock.fontSize - item.fontSize) > 2;
-            
-            if (isNewBlock) {
-                if (currentBlock) {
-                    blocks.push(currentBlock);
-                }
-                currentBlock = {
-                    text: item.text,
-                    x: item.x,
-                    y: item.y,
-                    fontSize: item.fontSize,
-                    fontName: item.fontName
-                };
-            } else {
-                currentBlock.text += ' ' + item.text;
-            }
-        });
-        
-        if (currentBlock) {
-            blocks.push(currentBlock);
-        }
-        
-        return blocks;
-    }
-    
-    function detectTables(blocks) {
-        return blocks.filter(block => 
-            block.text.includes('\t') || /\s{3,}/.test(block.text)
-        ).map(block => ({
-            type: 'table',
-            text: block.text,
-            cells: block.text.split(/\t|\s{3,}/).filter(cell => cell.trim().length > 0)
-        }));
-    }
-    
-    function detectLists(blocks) {
-        return blocks.filter(block => 
-            /^[\d•\-\*\+]\s+/.test(block.text.trim())
-        ).map(block => ({
-            type: 'list',
-            text: block.text,
-            marker: block.text.match(/^[\d•\-\*\+]+/)?.[0] || ''
-        }));
-    }
-    
-    function detectHeadings(blocks) {
-        const avgFontSize = blocks.reduce((sum, block) => sum + block.fontSize, 0) / blocks.length;
-        
-        return blocks.filter(block => 
-            block.fontSize > avgFontSize * 1.2 ||
-            block.fontName?.toLowerCase().includes('bold')
-        ).map(block => ({
-            ...block,
-            type: 'heading',
-            level: block.fontSize > avgFontSize * 1.8 ? 1 : 
-                   block.fontSize > avgFontSize * 1.5 ? 2 : 3
-        }));
-    }
-    
-    async function generateBaseHTML() {
-        for (let i = 0; i < totalPages; i++) {
-            const textStructure = rawTextContent[i];
-            
-            let baseHTML = `<div class="pdf-page-content" data-page="${textStructure.pageNum}">`;
-            
-            // Add headings
-            textStructure.headings.forEach(heading => {
-                baseHTML += `<h${heading.level} class="pdf-heading">${escapeHtml(heading.text)}</h${heading.level}>`;
-            });
-            
-            // Add tables
-            textStructure.tables.forEach(table => {
-                baseHTML += '<table class="table table-bordered">';
-                baseHTML += '<tr>';
-                table.cells.forEach(cell => {
-                    baseHTML += `<td>${escapeHtml(cell.trim())}</td>`;
-                });
-                baseHTML += '</tr></table>';
-            });
-            
-            // Add lists
-            textStructure.lists.forEach(list => {
-                baseHTML += `<ul><li>${escapeHtml(list.text)}</li></ul>`;
-            });
-            
-            // Add regular text blocks
-            textStructure.blocks.forEach(block => {
-                if (!textStructure.headings.some(h => h.text === block.text) &&
-                    !textStructure.tables.some(t => t.text === block.text) &&
-                    !textStructure.lists.some(l => l.text === block.text)) {
-                    baseHTML += `<p class="pdf-paragraph">${escapeHtml(block.text)}</p>`;
-                }
-            });
-            
-            baseHTML += '</div>';
-            
-            pages[i].content = baseHTML;
-            pages[i].textStructure = textStructure;
-        }
-    }
     
     async function enhanceWithLLM() {
-        for (let i = 0; i < totalPages; i++) {
-            await enhancePageWithLLM(pages[i]);
-            await new Promise(resolve => setTimeout(resolve, 500));
+        const BATCH_SIZE = 3;
+        const batches = [];
+        
+        // Create batches of 3 pages
+        for (let i = 0; i < totalPages; i += BATCH_SIZE) {
+            batches.push(pages.slice(i, i + BATCH_SIZE));
         }
+        
+        updateProgress(55, `Processing all ${batches.length} batches concurrently (${totalPages} pages total)`);
+        
+        // Process ALL batches concurrently
+        const allBatchPromises = batches.map((batch, batchIndex) => {
+            // Process all pages in each batch concurrently
+            const batchPromises = batch.map(page => enhancePageWithLLM(page));
+            return Promise.all(batchPromises);
+        });
+        
+        // Wait for all batches to complete
+        await Promise.all(allBatchPromises);
+        
+        updateProgress(95, `All ${totalPages} pages processed successfully`);
     }
     
     async function enhancePageWithLLM(page) {
@@ -263,72 +112,89 @@ document.addEventListener('DOMContentLoaded', function() {
             await pdfPage.render({ canvasContext: context, viewport: viewport }).promise;
             const pageImageBase64 = canvas.toDataURL('image/jpeg', 0.9);
             
-            // Generate content analysis report
-            const contentAnalysis = {
-                report: `
-📈 CONTENT COMPLEXITY ANALYSIS:
-   - Text Blocks: ${page.textStructure?.blocks?.length || 0}
-   - Tables Detected: ${page.textStructure?.tables?.length || 0}
-   - Lists Found: ${page.textStructure?.lists?.length || 0}
-   - Headings: ${page.textStructure?.headings?.length || 0}
-   - Graphics Present: YES
-
-⚠️ SPECIAL ATTENTION NEEDED:
-${page.textStructure?.tables?.length > 0 ? `- ${page.textStructure.tables.length} table(s) detected - ensure ALL rows and columns are captured` : ''}
-${page.textStructure?.lists?.length > 0 ? `- ${page.textStructure.lists.length} list(s) found - preserve exact numbering and nesting` : ''}
-- Graphics present - create detailed placeholders with descriptions
-${page.textStructure?.blocks?.length > 15 ? '- Dense text content - use proper sectioning and hierarchy' : ''}
-- Standard content extraction required`
-            };
+            // Extract hyperlinks
+            const annotations = await pdfPage.getAnnotations();
+            const links = annotations.filter(ann => ann.subtype === 'Link').map(link => ({
+                url: link.url || link.dest,
+                rect: link.rect,
+                text: link.contents || 'Link'
+            }));
             
-            // Comprehensive prompt for best output
-            const prompt = `You are an expert PDF-to-HTML converter with perfect visual analysis skills.
-**MISSION:**
-Convert PDF page ${page.id} to HTML—**ZERO content loss**, PERFECT structure, **no overlaps**.
-**EXTRACTION CHECKLIST:**
-- **Text:** All content (headers, body, footnotes, captions, marginal/side text), exact formatting (bold, italic, underline, font), text hierarchy, relationships
-- **Structure:** Tables (exact grid & borders), lists (nesting, bullets/numbering), headings (fonts/positions), columns/layout preserved
-- **Visuals:** All graphics (charts/graphs/images/diagrams/icons/symbols) precisely positioned; add labeled placeholders if needed
-- **Layout:** NO overlapping; use semantic HTML5; CSS Grid/Flexbox/absolute/z-index for complex/overlapping; maintain spacing/margins
-- **Special:** Watermarks/backgrounds, form elements, footnotes, page numbers, headers/footers—**capture ALL**
-**ANALYSIS INPUT:**
-- Content analysis: ${contentAnalysis.report}
-- Extracted structure: ${JSON.stringify(page.textStructure?.blocks)}
-- Graphics detected: YES
-- Original content (snippet): ${page.content}...
-**HTML OUTPUT — USE THIS BOILERPLATE:**
+        // System prompt with general instructions
+        const systemPrompt = `You are a PDF-to-HTML converter with expertise in visual analysis and Bootstrap icons.
+
+**Bootstrap Icon Integration:**
+- Select appropriate Bootstrap icons for all symbols.
+
+**Layout & Positioning:**
+- Preserve spatial relationships and orientations.
+- Use CSS to prevent overlap and ensure contrast.
+
+**Size & Scale:**
+- Maintain element sizes, font relationships, and spacing.
+
+**Extraction Checklist:**
+- Extract text, structure, icons, and layout accurately.
+- Use semantic HTML5 and Bootstrap icons.
+
+**HTML Template:**
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Page ${page.id} - Complete Content</title>
+<title>[Page Title]</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-* {margin:0;padding:0;box-sizing:border-box;}
-.page-container {position:relative;max-width:816px;margin:0 auto;background:#fff;padding:20px;line-height:1.4;}
-.content-layer {position:relative;z-index:1;}
-.positioned-element {position:absolute;z-index:2;}
-.graphics-region {position:relative;border:2px dashed #ccc;background:#f9f9f9;min-height:100px;margin:10px 0;display:flex;align-items:center;justify-content:center;}
-.pdf-table {border-collapse:collapse;width:100%;margin:15px 0;}
-.pdf-table th, .pdf-table td {border:1px solid #ddd;padding:8px;text-align:left;}
-.pdf-list {margin:10px 0;padding-left:20px;}
-.pdf-heading {margin:15px 0 10px 0;font-weight:bold;}
-.pdf-paragraph {margin:8px 0;}
-@media (max-width:768px){.page-container{padding:10px;}.positioned-element{position:relative!important;}}
+/* Styles for size, spacing, and layout */
 </style>
 </head>
 <body>
 <div class="page-container">
-  <div class="content-layer">
-    <!-- FULLY reproduce all page content here with semantic HTML5; NO overlapping; ALL elements present/positioned -->
-  </div>
+  <div class="background-layer"></div>
+  <div class="content-layer"></div>
 </div>
 </body>
-</html>`;
+</html>
+
+**Critical Requirements:**
+1. Match PDF sizes with .text-* classes.
+2. Maintain dimensions with .w-* and .min-h-* classes.
+3. Use spacing classes for margins and padding.
+4. Prevent overlap with CSS layout techniques.
+5. Preserve layout orientation.
+6. Ensure text contrast.
+7. Use z-index for layering.
+8. Use .chart-container and .image-* for sizing.
+9. Maintain responsiveness with layout classes.
+10. Replace icons with Bootstrap icons.`;
+
+            // User prompt with specific page data
+            const userPrompt = `**Mission:**
+Convert PDF page ${page.id} to HTML with no content loss, exact sizing, and Bootstrap icon integration.
+
+**Size Preservation:**
+- Match PDF font sizes with .text-* classes.
+- Use .w-* and .min-h-* for dimensions.
+- Replicate spacing with .spacing-* classes.
+
+**Hyperlinks:**
+${links.length > 0 ? links.map(link => `- URL: ${link.url} (Position: ${link.rect})`).join('\n') : 'No hyperlinks found.'}
+
+**Hyperlink Integration:**
+- Convert hyperlinks to <a> tags with href and target='_blank'.
+- Maintain styling and positioning with Bootstrap classes.
+
+Analyze the PDF page image and convert it to HTML, following system instructions and focusing on this page's content.`;
 
             const messages = [
-                {role: "user",content: [{type: "text",text: prompt},{type: "image_url",image_url: {url: pageImageBase64}
-          }]}];
+                {role: "system", content: systemPrompt},
+                {role: "user", content: [
+                    {type: "text", text: userPrompt},
+                    {type: "image_url", image_url: {url: pageImageBase64}}
+                ]}
+            ];
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -404,6 +270,12 @@ Convert PDF page ${page.id} to HTML—**ZERO content loss**, PERFECT structure, 
                 new bootstrap.Alert(alertDiv).close();
             }
         }, 5000);
+    }
+    
+    function updateProgress(percent, message) {
+        els.progressBar.style.width = `${percent}%`;
+        els.progressText.textContent = `${Math.round(percent)}%`;
+        els.conversionStatus.textContent = message;
     }
     
     function showLoader(message = 'Processing...') {
