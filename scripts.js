@@ -18,7 +18,7 @@ const elements = {
     pageTitle: $('pageTitle'), pageContent: $('pageContent'), pageCounter: $('pageCounter'),
     pageInput: $('pageInput'), goToPage: $('goToPage'), prevPage: $('prevPage'),
     nextPage: $('nextPage'), treeContent: $('treeContent'), treeVisualization: $('treeVisualization'),
-    restartBtn: $('restartBtn'), exportJsonBtn: $('exportJsonBtn'),
+    restartBtn: $('restartBtn'), exportJsonBtn: $('exportJsonBtn'), exportHtmlBtn: $('exportHtmlBtn'),
     expandTreeBtn: $('expandTreeBtn'), collapseTreeBtn: $('collapseTreeBtn'),
     ...['step-1', 'step-2', 'step-3', 'step-4'].reduce((acc, id, i) => ({ ...acc, [`step${i+1}`]: $(id) }), {})
 };
@@ -43,6 +43,7 @@ function setupEventListeners() {
     elements.pageInput.addEventListener('keyup', e => e.key === 'Enter' && goToSpecificPage());
     elements.restartBtn.addEventListener('click', () => restartExploration(appState.currentPage));
     elements.exportJsonBtn.addEventListener('click', () => exportJson(appState.currentPage));
+    elements.exportHtmlBtn.addEventListener('click', () => exportHtml(appState.currentPage));
     elements.expandTreeBtn.addEventListener('click', expandTree);
     elements.collapseTreeBtn.addEventListener('click', collapseTree);
 }
@@ -143,7 +144,7 @@ async function determineContentTypes(pages) {
                 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: "anthropic/claude-sonnet-4", messages })
+                    body: JSON.stringify({ model: "openai/gpt-4.1-mini", messages })
                 });
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -172,25 +173,16 @@ async function processNextInQueue() {
         return;
     }
     appState.currentlyProcessing = true;
-    
-    // Count static vs dynamic pages in the queue
     const staticCount = appState.processingQueue.filter(item => item.contentType === 'static').length;
     const dynamicCount = appState.processingQueue.filter(item => item.contentType === 'decision-tree').length;
-    
-    // Determine batch size based on PDF size and content distribution
     let BATCH_SIZE = appState.totalPages > 10 ? 10 : 3;
-    
-    // If static pages are significantly more numerous, use larger batches for them
     if (staticCount > dynamicCount * 2) {
         BATCH_SIZE = appState.totalPages > 10 ? 10 : 5;
     }
-    
     const staticPages = [];
     const decisionTreePages = [];
-    
-    // Prioritize static pages if they're more numerous
+
     if (staticCount > dynamicCount) {
-        // Fill batch with static pages first
         for (let i = 0; i < Math.min(BATCH_SIZE, appState.processingQueue.length); i++) {
             const item = appState.processingQueue[i];
             if (item.contentType === 'static' && staticPages.length < BATCH_SIZE) {
@@ -199,8 +191,6 @@ async function processNextInQueue() {
                 decisionTreePages.push(item);
             }
         }
-        
-        // Fill remaining slots with static pages if available
         if (staticPages.length < BATCH_SIZE) {
             for (let i = staticPages.length + decisionTreePages.length; i < appState.processingQueue.length && staticPages.length < BATCH_SIZE; i++) {
                 const item = appState.processingQueue[i];
@@ -210,7 +200,6 @@ async function processNextInQueue() {
             }
         }
     } else {
-        // Original logic for balanced or dynamic-heavy content
         for (let i = 0; i < Math.min(BATCH_SIZE, appState.processingQueue.length); i++) {
             const item = appState.processingQueue[i];
             if (item.contentType === 'static') {
@@ -425,6 +414,11 @@ function displayStaticPage(page) {
     elements.staticContent.style.display = 'block';
     elements.treeContent.style.display = 'none';
     
+    // Show export HTML button for static pages
+    if (elements.exportHtmlBtn) {
+        elements.exportHtmlBtn.style.display = 'inline-block';
+    }
+    
     // Wrap content in responsive container to prevent overlapping
     const wrappedContent = `
         <div class="pdf-page-wrapper">
@@ -442,6 +436,12 @@ function displayStaticPage(page) {
 function displayDecisionTreePage(page) {
     elements.staticContent.style.display = 'none';
     elements.treeContent.style.display = 'block';
+    
+    // Hide export HTML button for decision tree pages
+    if (elements.exportHtmlBtn) {
+        elements.exportHtmlBtn.style.display = 'none';
+    }
+    
     renderTreeVisualization(page.pageNumber);
 }
 
@@ -655,6 +655,21 @@ function exportJson(pageNumber) {
     }
 }
 
+function exportHtml(pageNumber) {
+    const page = appState.pages[pageNumber - 1];
+    if (page?.contentType !== 'static') return showAlert('Only static pages can be exported as HTML.', 'warning');
+    const blob = new Blob([page.content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { 
+        href: url, download: `page-${pageNumber}-content.html` 
+    });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showAlert(`HTML content for page ${pageNumber} downloaded!`, 'success');
+}
+
 function expandTree() {
     const treeState = appState.treeStates[appState.currentPage];
     if (treeState) {
@@ -738,7 +753,6 @@ function updateProcessingStep(step) {
 }
 
 function fixOverlappingElements() {
-    // Convert any remaining absolute positioned elements to relative flow
     const absoluteElements = elements.pageContent.querySelectorAll('[style*="position: absolute"], .position-absolute');
     absoluteElements.forEach(el => {
         el.style.position = 'relative';
@@ -747,16 +761,12 @@ function fixOverlappingElements() {
         el.classList.remove('position-absolute');
         el.classList.add('d-block', 'mb-2');
     });
-    
-    // Ensure content containers don't overflow
     const containers = elements.pageContent.querySelectorAll('div, section, article');
     containers.forEach(container => {
         container.style.maxWidth = '100%';
         container.style.wordWrap = 'break-word';
         container.style.overflowWrap = 'break-word';
     });
-    
-    // Fix any elements with fixed width that might cause horizontal scrolling
     const fixedWidthElements = elements.pageContent.querySelectorAll('[style*="width:"], [style*="min-width:"]');
     fixedWidthElements.forEach(el => {
         const style = el.style;

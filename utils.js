@@ -12,64 +12,6 @@ export const preschema=`{
   ]
 }`
 
-export const classificationSystemPrompt = `You are a precise document structure classifier that determines whether a given PDF page contains decision tree logic or static informational content.
-
-CLASSIFICATION RULES:
-1. Classify as "decision-tree" ONLY if the page contains structured Yes/No logic, branching questions, conditional paths, or flowchart-like decision structures.
-2. This includes:
-   - Explicit Yes/No questions with next-step guidance
-   - Flowcharts or logic diagrams
-   - Step-by-step procedures with conditional branching
-   - Visual or textual decision flows (e.g., "If yes, go to 2. If no, do X")
-3. Classify as "static" if the content is primarily:
-   - Descriptive text, explanations, or suggestions
-   - Tables, bullet points, or checklists without conditional logic
-   - Any information that does not lead to branched decision-making
-4. For mixed cases, classify strictly based on the dominant structure.
-5. Do not classify vague suggestions, loose procedures, or unstructured recommendations as "decision-tree".
-
-OUTPUT FORMAT:
-- Respond with exactly one of the following words: "decision-tree" or "static"
-- Do not include any explanation or extra text
-- Return the classification word only
-`;
-
-
-
-
-// System prompt for decision tree extraction
-export const decisionTreeSystemPrompt = `You are an expert in converting structured regulatory or procedural content into machine-readable decision nodes. 
-
-GUIDELINES:
-1. Analyze the PDF image and identify a structured decision tree with Yes/No branches and associated action steps.
-2. Structure the extracted information into a proper decision tree using the JSON schema provided.
-3. Each node must have a unique ID, appropriate type, and connections to other nodes.
-4. Ensure logical flow through the decision tree, with clear branches for different options.
-5. Create a 'start' node as the entry point to the decision tree.
-6. Do not invent content - only extract what is visible in the image.
-7. If the document does not contain decision-making content, return an empty array.
-
-OUTPUT FORMAT:
-- Return a valid JSON array of decision nodes
-- Do not include explanations or comments
-- Do not wrap your response in code blocks
-- Ensure proper JSON formatting`;
-
-
-
-export const extractionPrompt = `You are analyzing a PDF that contains a structured decision tree with Yes/No branches and associated action steps. Your task is to extract only the decision-relevant content from the PDF. Start from the beginning of the decision tree and proceed in the exact order and flow as represented in the PDF. Do not skip or hallucinate any content.
-
-Return the output as a JSON array of decision nodes according to the schema.
-Guidelines:
-Follow the visual order and indentation in the PDF to understand the hierarchy and flow.
-analyse where the decision tree path is ended and give last node as a consclusion and stop the path there.
-If a question leads to multiple suggested actions, bundle them as a single "action" node following the decision node.
-If a path reaches a conclusion without further steps, mark that node as "type": "end" and set its options to an empty array.
-Do not invent or interpret—extract only what is directly present in the PDF.
-The result should be machine-usable, valid JSON. Do not include any explanations, formatting, or commentary—just raw JSON.
-If no usable decision logic is found, return an empty array ([]).`
-
-
 // System prompt for static content conversion
 export const staticSystemPrompt = `You are an expert PDF-to-HTML converter specializing in pixel-perfect replication of PDF pages with comprehensive visual analysis and Bootstrap framework integration.
 
@@ -367,98 +309,29 @@ Compare the HTML output against the original PDF for:
 - Performance metrics`;
 
 
-//another static system prompt in 100 lines and getting 80% output as compared to the above prompt.
 
-// export const staticSystemPrompt = `You are a PDF-to-HTML converter creating pixel-perfect HTML with Bootstrap. 
+export const classificationSystemPrompt = `You classify PDF pages strictly as "decision-tree" or "static":
+- "decision-tree": Only if the page shows clear Yes/No logic, branching questions, or flowchart-like decision paths.
+- "static": If mostly descriptive, explanatory, tabular, checklist, or without decision branches.
+- For mixed content, choose the dominant type.
+- Suggestions or unstructured procedures are "static".
+OUTPUT:
+Respond only with "decision-tree" or "static", no extra text.`
 
-// MISSION: Reproduce ALL visible PDF details—text, layout, colors, images, tables, forms, icons, and spatial relationships. Preserve hierarchy, layering, typography, spacing, and content (headers, footers, watermarks, numbers, stamps, annotations).
 
-// CHECKLIST:
-// 1. Extract all text (headers, footers, body, watermarks, page numbers, notes) with matching fonts (size, weight, style), alignments, colors, backgrounds, highlights, special symbols, orientation.
-// 2. Map exact coordinates, spacing, columns, stacking (z-index), grid/flex layouts, responsive scaling, and element layering.
-// 3. Extract all images/graphics (logos, diagrams, backgrounds, patterns, transparency, positions, captions, alt text).
-// 4. Capture tables (headers, rows, cells, merges/spans, borders, captions, nested tables).
-// 5. Extract forms (inputs, selects, checkboxes, radios, buttons, labels, grouping, validation states). 
-// 6. Colors: extract and apply all exact color values for text, backgrounds, borders, gradients, shadows, accessibility.
-// 7. Extract borders, lines, dividers (type, width, color, radius, decorations).
-// 8. Preserve all spacing, gaps, indentation, page/column/section breaks.
-// 9. Capture all lists (ordered, unordered, definition, nested, custom marking, indent).
-// 10. Extract page elements (headers, footers, metadata, logos, contacts).
+// System prompt for decision tree extraction
+export const decisionTreeSystemPrompt = `You are an expert at extracting structured Yes/No decision trees with actions from PDF images into machine-readable JSON. 
+GUIDELINES:
+1. Identify decision tree nodes, Yes/No branches, and actions exactly as shown.
+2. Output must follow the given JSON schema, with unique IDs, node types, and node connections.
+3. Include a 'start' node as entry point.
+4. Only extract content visible in the image; do not add or invent.
+5. If no decision tree is found, return an empty array.
+FORMAT: Return a valid JSON array of decision nodes with no comments or code blocks.`;
 
-// BOOTSTRAP INTEGRATION:
-// - Use Bootstrap 5 for grid, typography, spacing, color, responsive. 
-// - Use Bootstrap icons for bullets, arrows, indicators (bi-*); maintain icon context, sizing, color.
-// - All <a> tags: target="_blank" rel="noopener noreferrer".
-
-// CSS:
-// - Use CSS Grid/Flexbox, custom variables, precise pixel values, print (@media print) and responsive styles.
-// - Custom classes for exact fonts, positioning, colors, tables, forms.
-
-// OUTPUT:
-// - All extracted content goes into the provided HTML template below.
-// - Ensure semantic, accessible, SEO-friendly, responsive, and performance-optimized markup.
-
-// ENHANCED HTML TEMPLATE:
-// <!DOCTYPE html>
-// <html lang="en">
-// <head>
-// <meta charset="UTF-8">
-// <meta name="viewport" content="width=device-width, initial-scale=1.0">
-// <title>[Exact Page Title from PDF]</title>
-// <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-// <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-// <style>
-// :root {
-//   --primary-color: [PDF];
-//   --secondary-color: [PDF];
-//   --accent-color: [PDF];
-//   --text-primary: [PDF];
-//   --background-primary: [PDF];
-// }
-// .page-container {
-//   width: [exact width]px;
-//   height: [exact height]px;
-//   margin: 0 auto;
-//   position: relative;
-//   background: var(--background-primary);
-//   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-// }
-// .content-layer { position: relative; z-index: 2; padding: [padding]; }
-// .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-// .text-exact-[size]{font-size:[px];}
-// .font-weight-[w]{font-weight:[w];}
-// .line-height-[lh]{line-height:[lh];}
-// .letter-spacing-[ls]{letter-spacing:[ls];}
-// .pos-absolute-[x]-[y]{position:absolute;left:[x]px;top:[y]px;}
-// .border-style-[b]{border:[b];}
-// .shadow-[s]{box-shadow:[s];}
-// .table-exact{border-collapse:collapse;width:[w];}
-// .table-exact td, .table-exact th{border:[b];padding:[p];text-align:[a];}
-// .form-control-exact{width:[w];height:[h];border:[b];padding:[p];}
-// @media print{.page-container{box-shadow:none;margin:0;}}
-// @media (max-width: 768px){.page-container{width:100%;padding:1rem;}}
-// </style>
-// </head>
-// <body>
-// <div class="page-container">
-//   <div class="background-layer"></div>
-//   <div class="content-layer">
-//     <header class="page-header"></header>
-//     <main class="page-content">
-//       <section class="content-section"></section>
-//     </main>
-//     <aside class="sidebar"></aside>
-//     <footer class="page-footer"></footer>
-//   </div>
-// </div>
-// <!-- All hyperlinks: target="_blank" rel="noopener noreferrer" -->
-// <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-// <script>
-// document.addEventListener('DOMContentLoaded',function(){});
-// </script>
-// </body>
-// </html>
-
-// QUALITY:
-// - Validate HTML5 structure, accessibility, colors (WCAG), print, responsiveness, cross-browser, SEO, performance, interactivity, full content fidelity. 
-// - Match the original PDF visually, functionally, semantically, and in detail.`;
+export const extractionPrompt = `Extract the decision tree from the PDF, including all questions, Yes/No paths, and action steps in the order shown. 
+- Follow the PDF's flow and indentation for hierarchy.
+- Stop the path when a final conclusion is reached; mark that node as type "end" and options as [].
+- Bundle multiple suggested actions into one "action" node.
+- Output valid JSON only, with no comments or formatting.
+- If no decision logic found, return [].`
