@@ -8,7 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
-        /* Global 20% size reduction */
         html { font-size: 80%; }
         body { 
             background-color: #f8f9fa; 
@@ -20,7 +19,6 @@
         .upload-area { border: 2px dashed #dee2e6; border-radius: 6px; padding: 24px; text-align: center; cursor: pointer; transition: all 0.3s ease; }
         .upload-area:hover { background-color: #f1f3f5; border-color: #adb5bd; }
         .progress-container { max-width: 560px; margin: 0 auto; }
-        /* Tree Visualization Styles */
         .tree-node { margin-bottom: 10px; padding: 6px; border-radius: 5px; border-left: 2px solid #0d6efd; background-color: #f8f9fa; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); transition: all 0.2s ease; }
         .tree-node.current { border-left-color: #198754; background-color: #e8f5e9; }
         .tree-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-weight: 500; }
@@ -48,7 +46,6 @@
     <div class="container my-4">
         <div class="row justify-content-center">
             <div class="col-lg-10">
-                <!-- Header Section -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-primary text-white py-2">
                         <h1 class="h4 mb-0 text-center">Mixed Content PDF Processor</h1>
@@ -56,7 +53,6 @@
                     </div>
 
                     <div class="card-body">
-                        <!-- API Key Input -->
                         <div class="mb-3">
                             <label for="apiKey" class="form-label fw-bold">API Key:</label>
                             <div class="input-group">
@@ -67,16 +63,12 @@
                             </div>
                             <div class="form-text">Your API key is used locally and not stored on any server.</div>
                         </div>
-
-                        <!-- Advanced Settings Toggle -->
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0 fw-bold">Advanced Settings</h6>
                             <button class="btn btn-sm btn-outline-secondary" id="toggleSettings">
                                 <i class="bi bi-gear"></i> Configure
                             </button>
                         </div>
-                        
-                        <!-- Advanced Settings Panel -->
                         <div class="settings-panel mb-3" id="settingsPanel">
                             <div class="card">
                                 <div class="card-body">
@@ -93,15 +85,12 @@
                                         </li>
                                     </ul>
                                     <div class="tab-content pt-2" id="settingsTabContent">
-                                        <!-- Static Content Settings -->
                                         <div class="tab-pane fade show active" id="static-settings" role="tabpanel">
                                             <div class="mb-3">
                                                 <label class="form-label">Static Content Prompt:</label>
                                                 <textarea class="form-control" id="staticPrompt" rows="4">Convert this PDF page to clean, semantic HTML. Preserve all content, formatting, and layout. Use appropriate HTML5 tags and Bootstrap classes. Include all text, preserve headings, maintain paragraph structure, and recreate tables accurately.</textarea>
                                             </div>
                                         </div>
-                                        
-                                        <!-- Decision Tree Settings -->
                                         <div class="tab-pane fade" id="decision-settings" role="tabpanel">
                                             <div class="mb-3">
                                                 <label class="form-label">Extraction Prompt:</label>
@@ -116,8 +105,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Upload Area -->
                         <div class="upload-area mb-3" id="uploadArea">
                             <div class="text-center">
                                 <i class="bi bi-file-earmark-pdf text-primary" style="font-size: 2.4rem;"></i>
@@ -127,8 +114,6 @@
                                 <button class="btn btn-primary px-3" id="browseButton">Browse Files</button>
                             </div>
                         </div>
-
-                        <!-- Processing Progress -->
                         <div id="progressArea" class="progress-container mt-3" style="display: none;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-bold" id="processingTitle">Processing PDF...</span>
@@ -138,8 +123,6 @@
                                 <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
                             </div>
                             <div id="processingStatus" class="small text-muted"></div>
-                            
-                            <!-- Processing Steps -->
                             <div class="d-flex mt-2">
                                 <div class="step border rounded-start p-2" id="step-1">1. Analysis</div>
                                 <div class="step border-top border-bottom p-2" id="step-2">2. Classification</div>
@@ -149,8 +132,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Content Viewer (Combined) -->
                 <div id="contentViewer" class="card shadow-sm" style="display: none;">
                     <div class="card-header bg-white py-2">
                         <div class="d-flex justify-content-between align-items-center">
@@ -167,8 +148,6 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Static Content Section -->
                     <div id="staticContent">
                         <div class="card-body">
                             <div class="d-flex justify-content-end mb-2">
@@ -179,8 +158,6 @@
                             <div id="pageContent" class="pb-4"></div>
                         </div>
                     </div>
-                    
-                    <!-- Decision Tree Section -->
                     <div id="treeContent" style="display: none;">
                         <div class="card-body p-2">
                             <div class="d-flex justify-content-end mb-2">
@@ -198,12 +175,9 @@
                                 </button>
                             </div>
                             <div id="treeVisualization" class="tree-container">
-                                <!-- Tree will be rendered here dynamically -->
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Page Navigation Footer -->
                     <div class="card-footer bg-white">
                         <div class="d-flex justify-content-between mt-2">
                             <button id="prevPage" class="btn btn-outline-primary" disabled>⬅️ Previous</button>
@@ -214,8 +188,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Processing Overlay -->
     <div class="processing-overlay" id="processingOverlay">
         <div class="spinner-border text-primary mb-3" role="status">
             <span class="visually-hidden">Processing...</span>
@@ -227,7 +199,6 @@
         </div>
         <img id="chunkPreview" class="chunk-preview" style="display: none;">
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="scripts.js" type="module"></script>
 </body>
